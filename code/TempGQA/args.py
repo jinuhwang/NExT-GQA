@@ -200,6 +200,10 @@ def get_args():
         "--gamma", type=float, default=1, help="Gaussian confidence interval"
     )
 
+    parser.add_argument(
+        "--dejavu-mode", type=str, default="original", help="dejavu mode"
+    )
+
     args = parser.parse_args()
 
     os.environ["TRANSFORMERS_CACHE"] = args.bert_path

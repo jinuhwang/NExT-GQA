@@ -13,6 +13,26 @@ import h5py
 from dataloader.prepare_video import *
 rd.seed(1)
 
+from .paths import get_path_manager
+path_manager = get_path_manager()
+from functools import partial
+from .prepare_video import sample_clips
+
+def load_embedding(feature_path, return_pt=True):
+    """
+    Load a feature vector from a .npz file.
+
+    Args:
+        feature_path (str): Path to the .npz file.
+
+    Returns:
+        embedding (np.ndarray): The feature vector.
+    """
+    with np.load(feature_path, allow_pickle=True) as data:
+        embedding = data['embeddings']
+    if return_pt:
+        embedding = torch.from_numpy(embedding)
+    return embedding
 
 class VideoQADataset(Dataset):
     def __init__(
@@ -26,7 +46,8 @@ class VideoQADataset(Dataset):
         max_feats=20,
         mc=0,
         feat_type='CLIP',
-        vg_loss=0
+        vg_loss=0,
+        args=None
     ):
         """
         :param csv_path: path to a csv containing columns video_id, question, answer
@@ -58,6 +79,7 @@ class VideoQADataset(Dataset):
         self.mode = osp.basename(csv_path).split('.')[0] #train, val or test
 
         self.agu = False
+
         
         if self.mode not in ['val', 'test']:
             self.all_answers = set(self.data['answer'])
@@ -92,6 +114,65 @@ class VideoQADataset(Dataset):
         #         vqid = vqid.decode("utf-8")
         #         self.frame_feats[str(vqid)] = feat
 
+        mode = args.dejavu_mode
+        if mode == "vanila":
+            pass
+        elif mode == "original":
+            self.get_feature_path = partial(
+                path_manager.get_feature_path,
+                dataset='nextqa',
+                fps=2,
+                split=self.mode,
+                base_model_name='openai/clip-vit-large-patch14',
+                use_v2=True,
+            )
+        elif "reuse" in mode:
+            reuse_model_name = mode.split('-')[-1]
+            self.get_feature_path = partial(
+                path_manager.get_reuse_path,
+                dataset='nextqa',
+                fps=2,
+                split=self.mode,
+                base_model_name='openai/clip-vit-large-patch14',
+                use_v2=True,
+                reuse_model_name=reuse_model_name,
+            )
+        elif "diffrate" in mode:
+            flops = float(mode.split('-')[-1])
+            self.get_feature_path = partial(
+                path_manager.get_diffrate_path,
+                dataset='nextqa',
+                fps=2,
+                split=self.mode,
+                base_model_name='openai/clip-vit-large-patch14',
+                use_v2=True,
+                flops=flops,
+            )
+        elif "eventful" in mode:
+            topk = int(mode.split('-')[-1])
+            self.get_feature_path = partial(
+                path_manager.get_eventful_path,
+                dataset='nextqa',
+                fps=2,
+                split=self.mode,
+                base_model_name='openai/clip-vit-large-patch14',
+                use_v2=True,
+                topk=topk,
+            )
+        elif "cmc" in mode:
+            threshold = -int(mode.split('-')[-1])
+            self.get_feature_path = partial(
+                path_manager.get_cmc_path,
+                dataset='nextqa',
+                fps=2,
+                split=self.mode,
+                base_model_name='openai/clip-vit-large-patch14',
+                use_v2=True,
+                threshold=threshold,
+            )
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+        self.dejavu_mode = mode
 
     def __len__(self):
         return len(self.data)
@@ -121,8 +202,27 @@ class VideoQADataset(Dataset):
         fnum = feat.shape[0]
         sp_fids = np.linspace(0, fnum-1, self.max_feats, dtype=int)
         feat = feat[sp_fids]
-        
-        return feat
+
+        if self.dejavu_mode == "vanila":
+            return feat
+
+        dejavu_feat = []
+        idx = 0
+        while True:
+            path = self.get_feature_path(vid_id, 'o', idx)
+            if not path.exists():
+                break
+            idx += 1
+            dejavu_feat.append(load_embedding(path))
+        if len(dejavu_feat) == 0:
+            print(f"No features found at {path}")
+
+        sample_idxs = sample_clips(len(dejavu_feat), len(feat), num_frames_per_clip=4)
+        dejavu_feat = [dejavu_feat[i] for i in sample_idxs]
+        dejavu_feat = torch.stack(dejavu_feat, dim=0)
+        # print(torch.cosine_similarity(torch.tensor(feat), dejavu_feat, dim=1))
+
+        return dejavu_feat
     
     def get_vqid_feats(self, vqid):
 
@@ -345,7 +445,8 @@ def get_videoqa_loaders(args, features_path, a2id, tokenizer, test_mode):
             a2id=a2id,
             max_feats=args.max_feats,
             mc=args.mc,
-            feat_type =args.feat_type
+            feat_type =args.feat_type,
+            args=args
         )
 
         test_loader = DataLoader(
@@ -368,7 +469,8 @@ def get_videoqa_loaders(args, features_path, a2id, tokenizer, test_mode):
             max_feats=args.max_feats,
             mc=args.mc,
             feat_type =args.feat_type,
-            vg_loss=args.vg_loss
+            vg_loss=args.vg_loss,
+            args=args
         )
         train_loader = DataLoader(
             train_dataset,
@@ -388,6 +490,7 @@ def get_videoqa_loaders(args, features_path, a2id, tokenizer, test_mode):
             max_feats=args.max_feats,
             mc=args.mc,
             feat_type =args.feat_type,
+            args=args
         )
         val_loader = DataLoader(
             val_dataset,

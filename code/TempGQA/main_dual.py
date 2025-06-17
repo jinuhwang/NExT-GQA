@@ -144,26 +144,26 @@ def main(args):
     else:   
     # Evaluate
         test_acc, results, ground = eval(model, test_loader, a2v, args, test=True)
-        save_path = osp.join(args.save_dir, f'{args.test}-res.json')
+        save_path = osp.join(args.save_dir, f'{args.dejavu_mode}-res.json')
         save_to(save_path, results)
         
         ground_att, ground_gs = ground[0], ground[1]
         if args.baseline in ['NG', 'NG+']:
-            gd_path = osp.join(args.save_dir, f'{args.test}_ground_gs.json')
+            gd_path = osp.join(args.save_dir, f'{args.dejavu_mode}_ground_gs.json')
             save_to(gd_path, ground_gs)
-            att_path = osp.join(args.save_dir, f'{args.test}_ground_att.json')
+            att_path = osp.join(args.save_dir, f'{args.dejavu_mode}_ground_att.json')
             save_to(att_path, ground_att)
             from tools import getspan
-            getspan.main(args.save_dir, args.test)
+            getspan.main(args.save_dir, args.test, args.dejavu_mode)
             import eval_ground
-            eval_ground.main(args.save_dir, osp.basename(gd_path), True)
+            eval_ground.main(args.save_dir, args.test, args.dejavu_mode, osp.basename(gd_path), True)
         if args.baseline == 'posthoc':
-            att_path = osp.join(args.save_dir, f'{args.test}_ground_att.json')
+            att_path = osp.join(args.save_dir, f'{args.dejavu_mode}_ground_att.json')
             save_to(att_path, ground_att)
             from tools import getspan
-            getspan.main(args.save_dir, args.test)
+            getspan.main(args.save_dir, args.test, args.dejavu_mode)
             import eval_ground
-            eval_ground.main(args.save_dir, f'{args.test}_ground_ada.json')
+            eval_ground.main(args.save_dir, args.test, args.dejavu_mode, osp.basename(att_path), True)
         
 
 if __name__ == "__main__":

@@ -1,5 +1,11 @@
-GPU=$1
-CUDA_VISIBLE_DEVICES=$GPU python main_dual.py --checkpoint_dir=nextgqa \
+#! /bin/bash
+
+if [ -z "$1" ]; then
+	echo "Usage: $0 <dejavu-mode>"
+	exit 1
+fi
+
+python main_dual.py --checkpoint_dir=nextgqa \
 	--dataset=nextgqa \
 	--mc=5 \
 	--feat_type='CLIPL' \
@@ -22,4 +28,5 @@ CUDA_VISIBLE_DEVICES=$GPU python main_dual.py --checkpoint_dir=nextgqa \
 	--sigma=9 \
 	--save_dir='../../../data/gmodels/NG+/TempCLIP/' \
 	--pretrain_path='../../../data/gmodels/NG+/TempCLIP/best_model.pth' \
-	--gamma=1.0
+	--gamma=1.0 \
+	--dejavu-mode $1

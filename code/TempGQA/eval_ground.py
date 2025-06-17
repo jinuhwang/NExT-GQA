@@ -114,14 +114,13 @@ def combine(pred1, pred2, gt):
     return cb_ground
 
 
-def main(res_dir, filename, gs=False):
+def main(res_dir, dset, dejavu_mode, filename, gs=False):
 
     data_dir = '../../datasets/nextgqa/'
     
-    dset = filename.split('_')[0]
     gt_file = osp.join(data_dir, f'gsub_{dset}.json')
     pred_file = osp.join(res_dir, filename)
-    qa_file = osp.join(res_dir, f'{dset}-res.json')
+    qa_file = osp.join(res_dir, f'{dejavu_mode}-res.json')
     # sub_file = osp.join('./aba/TempVQA/gdqa/gdqa_sub.json')
     # sub = load_file(sub_file)
     gt_ground = load_file(gt_file)
@@ -132,13 +131,13 @@ def main(res_dir, filename, gs=False):
 
     if 1:
         print('=============post-hoc ground==============')
-        pred_file = osp.join(res_dir, f'{dset}_ground_ada.json')
+        pred_file = osp.join(res_dir, f'{dejavu_mode}_ground_ada.json')
         pred_ground_att = load_file(pred_file)
         eval_ground(gt_ground, pred_ground_att, pred_qa, gs=False)
         
         print('=======merge post-hoc and gauss mask======')
         cb_ground = combine(pred_ground, pred_ground_att, gt_ground)
-        cb_ground_file = osp.join(res_dir, f'{dset}_ground_cb.json')
+        cb_ground_file = osp.join(res_dir, f'{dejavu_mode}_ground_cb.json')
         eval_ground(gt_ground, cb_ground, pred_qa, gs=False)
         save_to(cb_ground_file, cb_ground)
 
